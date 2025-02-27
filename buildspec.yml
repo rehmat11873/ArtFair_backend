@@ -75,32 +75,29 @@
 
 
 version: 0.2
-env:
-  variables:
-    ECR_REPO_NAME: demo-paras
-    AWS_REGION: eu-north-1  # Ensure this is set correctly test test
-    AWS_ACCOUNT_ID: 559050230274
+
 phases:
   pre_build:
     commands:
       - echo "Logging in to Amazon ECR Public..."
       - aws ecr-public get-login-password --region us-east-1 | docker login -u AWS --password-stdin public.ecr.aws
       - echo "Logging in to Amazon ECR (Private)..."
-      - ECR_MAIN_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-      # - aws ecr get-login-password --region ${AWS_REGION} | docker login -u AWS --password-stdin ${ECR_MAIN_URI}
-      - aws ecr get-login-password --region eu-north-1 | docker login -u AWS --password-stdin ${ECR_MAIN_URI}
-      - ECR_IMAGE_URI="${ECR_MAIN_URI}/${ECR_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION:0:8}"
+      - aws ecr get-login-password --region eu-north-1 | docker login -u AWS --password-stdin 559050230274.dkr.ecr.eu-north-1.amazonaws.com
+      - ECR_IMAGE_URI="559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:latest"
+
   build:
     commands:
       - echo "Building Docker Image..."
       - docker build -t artfair:latest .
+
   post_build:
     commands:
       - echo "Tagging and Pushing Docker Image..."
-      - docker tag artfair:latest ${ECR_IMAGE_URI}
-      - docker push ${ECR_IMAGE_URI}
+      - docker tag artfair:latest 559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:latest
+      - docker push 559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:latest
       - echo "Generating imagedefinitions.json for ECS..."
-      - printf '[{"name":"artfair","imageUri":"%s"}]' ${ECR_IMAGE_URI} > imagedefinitions.json
+      - printf '[{"name":"artfair","imageUri":"%s"}]' "559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:latest" > imagedefinitions.json
+
 artifacts:
   files:
     - imagedefinitions.json
