@@ -1,0 +1,49 @@
+version: "3"
+services:
+  postgresql15:
+    container_name: postgreSQL
+    image:  postgres:15 
+    ports:
+      - "5432:5432" # Default PostgreSQL15 Port
+    restart: always # Always restart the container unless it is stopped manually.
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Persist PostgreSQL data on the host.
+    environment:
+      POSTGRES_USER: postgres_user # Default user.
+      POSTGRES_PASSWORD: password # user password
+      POSTGRES_DB: artfair_db 
+    networks:
+      - shared_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  backend:
+    container_name: backend
+    image: artfair/backend
+    tty: true
+    build: .
+    ports:
+      - "8000:8000"
+    command: python manage.py runserver 0.0.0.0:8000
+    depends_on:
+      postgresql15:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgresql15
+      - DB_PORT="5432"
+      - DB_NAME=artfair_db
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+    networks:
+      - shared_network
+
+networks:
+  shared_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

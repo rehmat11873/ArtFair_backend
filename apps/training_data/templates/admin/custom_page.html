@@ -1,0 +1,273 @@
+{% extends "admin/base_site.html" %}
+
+{% block extrahead %}
+    <!-- 1. Add CSS to <head> -->
+    <link href="https://releases.transloadit.com/uppy/v4.13.0/uppy.min.css" rel="stylesheet">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <!-- 2. Import Uppy script -->
+
+    {% if settings.REMOTE_STATIC_FILES %}
+    <!-- Uppy S3 Configuration -->
+
+
+    <script type="module">
+        import { Uppy, Dashboard, AwsS3 } from "https://releases.transloadit.com/uppy/v4.13.0/uppy.min.mjs";
+        const uppy = new Uppy()
+        // Generate csrfToken for S3 Upload
+        let csrftoken = null;
+        const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
+        
+        if (csrfElement) {
+            csrftoken = csrfElement.value;
+        } else {
+            // Fallback: Try fetching it from a meta tag if it's not in the form
+            const metaTag = document.querySelector('meta[name="csrf-token"]');
+            if (metaTag) {
+                csrftoken = metaTag.getAttribute('content');
+            }
+        }
+        // Add Uppy Dashboard
+        uppy.use(Dashboard, {
+            inline: true,
+            target: '#uppy',
+            replaceTargetContent: true,
+            showProgressDetails: true,
+            note: 'Drag and drop your files here or click to select files.',
+        })
+        .use(AwsS3, {
+            // The function getUploadParameters is used to upload files with size less than 200MB
+            getUploadParameters(file) {
+                return fetch('/training_data/generate-s3-presigned-url/', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        file_name: file.name,
+                        file_type: file.type,
+                    }),
+                    headers: {
+                        'Content-Type': 'application/json',
+                        "X-CSRFToken": csrftoken
+                    },
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.url) {
+                        console.error("Error: Pre-signed URL missing from response", data);
+                        throw new Error("Pre-signed URL missing");
+                    }
+                    console.log("DATA:", data);
+                    console.log("Pre-signed URL:", data.url);
+                    return {
+                        method: "PUT",
+                        url: data.url,
+                        headers: {
+                            "Content-Type": file.type
+                        }
+                    };
+                });
+            },
+            shouldUseMultipart(file) {
+                return file.size > 100 * 2 ** 20;
+            },
+            createMultipartUpload(file) {
+                let data = {"type": file.type, "file_name": file.name};
+                return fetch("/training_data/create_s3_multipart/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrftoken
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(res => res.json());
+            },
+            listParts(file, parts) {
+                let data = {"key": parts.key};
+                return fetch(`/training_data/s3_multipart_listParts/${parts.uploadId}/`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrftoken
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(res => res.json());
+            },
+            signPart(file, {key, uploadId, partNumber}) {
+                let data = {"key": key}
+                return fetch(`/training_data/s3_multipart_signPart/${uploadId}/${partNumber}/`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrftoken
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(res => res.json());
+            },
+            abortMultipartUpload(file, {uploadId, key}) {
+                let data = {"key": key};
+                return fetch(`/training_data/s3_multipart_abort/${uploadId}/`, {
+                    method: "DELETE",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrftoken
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(res => res.json());
+            },
+            completeMultipartUpload(file, {uploadId, key, parts}) {
+                const formattedParts = parts.map(p => {        
+                    let eTag = p.ETag;
+                    eTag = eTag.replace(/^"(.*)"$/, '$1');
+                    return {
+                        "ETag": eTag,
+                        "PartNumber": p.PartNumber
+                    };
+                });
+                let data = {"key": key, "parts": formattedParts};
+                return fetch(`/training_data/s3_multipart_complete/${uploadId}/`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrftoken
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(res => res.json());
+            }
+        });
+
+        // Handle completion
+        uppy.on('complete', (result) => {
+            if (result.failed.length > 0) {
+                return;
+            }
+            {% comment %} const userEmail = document.getElementById("user_email").value; {% endcomment %}
+            const userId = document.getElementById("user_id").value;  // Get selected user ID
+            console.log(userId, 'userId')
+            if (!userId) {
+                alert("Please select a user before uploading.");
+                return;
+            }
+            const uploadedFiles = result.successful;
+            const fileMetaDataArr = uploadedFiles.map(file => {
+                console.log(file, 'FILE_____');
+                const data = file.response.body;
+                console.log(data, 'data');
+                let fileName = file.data.name;
+                console.log(fileName, 'FIleName');
+                let s3Url = data.location;
+                // Set file size limit to 100MiB, direct Uppy to use multipart upload only when a file size exceed fileSizeLimitForMultiPartUpload.
+                // let fileSizeLimitForMultiPartUpload = 100 * 2 ** 20;
+                //if (file.size < fileSizeLimitForMultiPartUpload) {
+                 //   fileName = data.key;
+                  //  s3Url = data.location;
+                //} 
+                return {
+                    s3_url: s3Url,
+                    user_email: document.getElementById("user_id").selectedOptions[0].dataset.email,
+                    original_filename: fileName
+                }
+            });
+            // Chunk filemeta data into large bulks to the backend for faster uploading, to be safe, limit the bulk upload to 500 files per request (about 150KB per request)
+            let i = 0;
+            while (i < fileMetaDataArr.length) {
+                const bulk = [];
+                const curEnd = Math.min(i + 500, fileMetaDataArr.length); 
+                for (; i < curEnd; i++) {
+                    bulk.push(fileMetaDataArr[i]);
+                }
+                // Make API request to create file entry in the database 
+                fetch("/training_data/create/", {
+                    method: "POST",
+                    body: JSON.stringify(bulk),
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrftoken
+                    },
+                })
+                .then(res => res.json())
+                .catch(error => {
+                    console.error('Error creating file metadata:', error);
+                    alert('An error occurred.');
+                }); 
+            }
+        });
+    </script>
+
+    {% else %}
+    <!-- Local XHR Upload Configuration -->
+    <script type="module">
+
+        import { Uppy, Dashboard, XHRUpload } from "https://releases.transloadit.com/uppy/v4.13.0/uppy.min.mjs";
+
+            // Extract CSRF token
+            let csrftoken = null;
+            const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (csrfElement) {
+                csrftoken = csrfElement.value;
+            } else {
+                const metaTag = document.querySelector('meta[name="csrf-token"]');
+                if (metaTag) {
+                    csrftoken = metaTag.getAttribute('content');
+                }
+            }
+
+            const uppy = new Uppy()
+            .use(Dashboard, {
+                inline: true,
+                target: '#uppy',
+                replaceTargetContent: true,
+                showProgressDetails: true,
+                note: 'Drag and drop your files here or click to select files.',
+            })
+            .use(XHRUpload, {
+                endpoint: "/training_data/media/upload/",
+                responseType: 'json',
+                formData: true,
+                fieldName: "file",
+                headers: {
+                    "X-CSRFToken": csrftoken
+                },
+                getResponseData (responseText, response) {
+                    return {
+                        url: responseText.response.file_url || response.url || "", 
+                        name: responseText.response.original_filename || "Unknown",
+                        mediaId: responseText.response.media_id || null 
+                    };
+                }
+               
+            });
+
+            uppy.on('complete', (result) => {
+                console.log('✅ Local upload complete:', result);
+                if (result.failed.length > 0) return;
+                
+                const userId = document.getElementById("user_id").value;
+                if (!userId) {
+                    alert("Please select a user before uploading.");
+                    return;
+                }
+              
+            });
+            
+
+    </script>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+    <h1>Upload File to S3</h1>
+    <div>
+        <label for="user_id">Select User</label>
+        <select id="user_id" name="user_id" required>
+            <option value="" disabled selected>Choose a user</option>
+            {% for user in users %}
+                <option value="{{ user.id }}" data-email="{{ user.email }}">{{ user.first_name }} {{ user.last_name }} ({{ user.email }})</option>
+            {% endfor %}
+        </select>
+    </div>
+    <!-- Uppy File Upload Section -->
+    <div id="uppy" style="width: 100%; height: 500px;"></div>
+{% endblock %}

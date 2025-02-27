@@ -1,0 +1,10 @@
+{% extends 'admin/change_form.html' %}
+
+{% block submit_buttons_bottom %}
+{{ block.super }}
+  {% if original %}
+    <div class="submit-row">
+      <a href="{% url 'admin:process_video' original.pk %}">Process Video Page</a>
+    </div>
+  {% endif %}
+{% endblock %}
