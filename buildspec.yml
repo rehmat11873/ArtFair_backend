@@ -1,0 +1,72 @@
+# version: 0.2
+
+# env:
+#   variables:
+#     ECR_URI: "559050230274.dkr.ecr.eu-north-1.amazonaws.com/your-repo"
+#     AWS_DEFAULT_REGION: "eu-north-1"
+  # secrets-manager:
+  #   DATABASE_URL: "dev/django-secrets:DATABASE_URL"
+  #   DJANGO_SECRET_KEY: "dev/django-secrets:DJANGO_SECRET_KEY"
+
+# phases:
+#   pre_build:
+#     commands:
+#       - echo "Authenticating with ECR..."
+#       - aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URI
+#       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+
+#   build:
+#     commands:
+#       - echo "Building Docker image..."
+#       - docker build -t $ECR_URI:$COMMIT_HASH .
+#       - docker tag $ECR_URI:$COMMIT_HASH $ECR_URI:latest
+
+  # post_build:
+  #   commands:
+  #     - echo "Pushing to ECR..."
+  #     - docker push $ECR_URI:$COMMIT_HASH
+  #     - docker push $ECR_URI:latest
+  #     - echo "Deploying to EC2..."
+  #     - aws ssm send-command \
+  #         --instance-ids "your-ec2-instance-id" \
+  #         --document-name "AWS-RunShellScript" \
+  #         --parameters commands="\
+  #             docker pull $ECR_URI:latest,\
+  #             docker stop django-app || true,\
+  #             docker rm django-app || true,\
+  #             docker run -d \
+  #               -p 8080:8080 \
+  #               --name django-app \
+  #               -e DATABASE_URL='$DATABASE_URL' \
+  #               -e DJANGO_SECRET_KEY='$DJANGO_SECRET_KEY' \
+  #               $ECR_URI:latest"
+
+
+
+
+version: 0.2
+env:
+  variables:
+    ECR_REPO_NAME: demo-paras
+phases:
+  pre_build:
+    commands:
+      # ECR Public Gallery login
+      - aws ecr-public get-login-password --region us-east-1 | docker login -u AWS --password-stdin public.ecr.aws
+      # ECR login
+      - ECR_MAIN_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+      - aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin 559050230274.dkr.ecr.eu-north-1.amazonaws.com
+      # - aws ecr get-login-password --region ${AWS_REGION} | docker login -u AWS --password-stdin ${ECR_MAIN_URI}
+      - ECR_IMAGE_URI="${ECR_MAIN_URI}/${ECR_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION:0:8}"
+  build:
+    commands:
+      - docker build -t artfair:latest .
+  post_build:
+    commands:
+      - docker tag artfair:latest ${ECR_IMAGE_URI}
+      - docker push ${ECR_IMAGE_URI}
+      # Generate image definitions file for ECS
+      - printf '[{"name":"artfair","imageUri":"%s"}]' ${ECR_IMAGE_URI} > imagedefinitions.json
+artifacts:
+  files:
+    - imagedefinitions.json
