@@ -38,3 +38,7 @@ def fire_task(request):
         return JsonResponse({"task": "Task fired"})
 
     return JsonResponse({"error": "Method Not Allowed"}, status=405)
+
+
+def health_check(request):
+    return JsonResponse({"status": "healthy"}, status=200)
