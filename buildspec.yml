@@ -96,7 +96,8 @@ phases:
       - docker tag artfair:latest 559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:latest
       - docker push 559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:latest
       - echo "Generating imagedefinitions.json for ECS..."
-      - printf '[{"name":"artfair","imageUri":"%s"}]' "559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:latest" > imagedefinitions.json
+      - IMAGE_TAG=$(date +%Y%m%d%H%M%S)   # Generates a unique timestamp (YYYYMMDDHHMMSS)
+      - printf '[{"name":"artfair","imageUri":"%s"}]' "559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:$IMAGE_TAG" > imagedefinitions.json
 
 artifacts:
   files:

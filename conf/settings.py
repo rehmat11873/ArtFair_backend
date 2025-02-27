@@ -49,14 +49,25 @@ AUTH_PASSWORD_VALIDATORS = [
 # -----------------------------------------------------------------------------
 # Databases
 # -----------------------------------------------------------------------------
-DJANGO_DATABASE_URL = env.db('DATABASE_URL', default=f'sqlite:///{BASE_DIR}/db.sqlite3')
-DATABASES = {'default': DJANGO_DATABASE_URL}
+# DJANGO_DATABASE_URL = env.db('DATABASE_URL', default=f'sqlite:///{BASE_DIR}/db.sqlite3')
+# DATABASES = {'default': DJANGO_DATABASE_URL}
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.sqlite3',
 #         'NAME': BASE_DIR / "db.sqlite3",
 #     }
 # }
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env.db('DB_NAME'),
+        'USER': env.db('DB_USER'),
+        'PASSWORD': env.db('DB_PASSWORD'),
+        'HOST': env.db('DB_HOST'),
+        'PORT': env.db('DB_PORT'),
+    }
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
