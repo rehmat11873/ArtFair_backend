@@ -78,7 +78,7 @@ version: 0.2
 env:
   variables:
     ECR_REPO_NAME: demo-paras
-    AWS_REGION: eu-north-1  # Ensure this is set correctly
+    AWS_REGION: eu-north-1  # Ensure this is set correctly test
 phases:
   pre_build:
     commands:
