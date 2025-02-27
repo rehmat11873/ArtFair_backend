@@ -84,20 +84,24 @@ phases:
       - echo "Logging in to Amazon ECR (Private)..."
       - aws ecr get-login-password --region eu-north-1 | docker login -u AWS --password-stdin 559050230274.dkr.ecr.eu-north-1.amazonaws.com
       - IMAGE_TAG=$(date +%Y%m%d%H%M%S)   # Generates a unique timestamp (YYYYMMDDHHMMSS)
-      - ECR_IMAGE_URI="559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:$IMAGE_TAG"
+      - ECR_IMAGE_URI="559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:${CODEBUILD_RESOLVED_SOURCE_VERSION:0:8}"
+      # - ECR_IMAGE_URI="${ECR_MAIN_URI}/${ECR_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION:0:8}"
 
   build:
     commands:
       - echo "Building Docker Image..."
-      - docker build -t artfair:$IMAGE_TAG .
+      - docker build -t artfair:latest .
 
   post_build:
     commands:
       - echo "Tagging and Pushing Docker Image..."
-      - docker tag artfair:$IMAGE_TAG 559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:$IMAGE_TAG
-      - docker push 559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:$IMAGE_TAG
+      - docker tag artfair:latest ${ECR_IMAGE_URI}
+      - docker push ${ECR_IMAGE_URI}
       - echo "Generating imagedefinitions.json for ECS..."
-      - printf '[{"name":"artfair","imageUri":"%s"}]' "559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:$IMAGE_TAG" > imagedefinitions.json
+      # - printf '[{"name":"artfair","imageUri":"%s"}]' "559050230274.dkr.ecr.eu-north-1.amazonaws.com/demo-paras:$IMAGE_TAG" > imagedefinitions.json
+      - printf '[{"name":"artfair","imageUri":"%s"}]' ${ECR_IMAGE_URI} > imagedefinitions.json
+      # - echo "Updating ECS Service to Deploy Latest Image..."
+      # - aws ecs update-service --cluster YOUR_CLUSTER_NAME --service YOUR_SERVICE_NAME --force-new-deployment
 
 artifacts:
   files:

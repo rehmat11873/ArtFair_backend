@@ -61,11 +61,11 @@ AUTH_PASSWORD_VALIDATORS = [
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env.db('DB_NAME'),
-        'USER': env.db('DB_USER'),
-        'PASSWORD': env.db('DB_PASSWORD'),
-        'HOST': env.db('DB_HOST'),
-        'PORT': env.db('DB_PORT'),
+        'NAME': "django_dev",
+        'USER': "django_dev_admin",
+        'PASSWORD': "django_dev_admin!123",
+        'HOST': "dev-django-db.cjaq2me4s4n0.eu-north-1.rds.amazonaws.com",
+        'PORT': "5432"
     }
 }
 
