@@ -1,7 +1,7 @@
 # FROM python:3.12.2
 FROM public.ecr.aws/docker/library/python:3.12.2-slim-bullseye
 ENV PYTHONBUFFERED=1
-ENV PORT=8080
+ENV PORT=80
 WORKDIR /app
 COPY . /app/
 RUN apt-get update && apt-get install -y ffmpeg
